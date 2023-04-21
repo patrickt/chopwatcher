@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		5515C8AE29F30AE4003D2B4C /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 5515C8AD29F30AE4003D2B4C /* main.c */; };
+		5515C8B629F30DFB003D2B4C /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5515C8B529F30DFB003D2B4C /* CoreServices.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +26,7 @@
 /* Begin PBXFileReference section */
 		5515C8AA29F30AE4003D2B4C /* chopwatcher */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = chopwatcher; sourceTree = BUILT_PRODUCTS_DIR; };
 		5515C8AD29F30AE4003D2B4C /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		5515C8B529F30DFB003D2B4C /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +34,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5515C8B629F30DFB003D2B4C /* CoreServices.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -43,6 +46,7 @@
 			children = (
 				5515C8AC29F30AE4003D2B4C /* chopwatcher */,
 				5515C8AB29F30AE4003D2B4C /* Products */,
+				5515C8B429F30DFB003D2B4C /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -60,6 +64,14 @@
 				5515C8AD29F30AE4003D2B4C /* main.c */,
 			);
 			path = chopwatcher;
+			sourceTree = "<group>";
+		};
+		5515C8B429F30DFB003D2B4C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				5515C8B529F30DFB003D2B4C /* CoreServices.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
