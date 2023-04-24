@@ -7,11 +7,12 @@
 //
 
 #include <stdio.h>
+#include <dirent.h>
 #include <libgen.h>
 #include <CoreServices/CoreServices.h>
 
-static unsigned nthfile = 0; // TODO: a real solution
-static bool verbose = true;
+static size_t nthfile = 1;
+static bool verbose = false;
 
 void die(const char* message)
 {
@@ -30,9 +31,8 @@ void describe_event(struct FileEvent *evt) {
     printf("Event id %" PRIu64 ":\n", (uint64_t)evt->ident);
     printf("\tpath: %s\n", evt->path);
     printf("\tindex: %zu\n", evt->index);
-#define xstr(s) str(s)
-#define str(s) #s
-#define _GO(name) if (evt->flags & kFSEventStreamEventFlag##name) printf("\t%s\n", xstr(name));
+#define _STR(s) #s
+#define _GO(name) if (evt->flags & kFSEventStreamEventFlag##name) printf("\t%s\n", _STR(name));
     _GO(MustScanSubDirs);
     _GO(UserDropped);
     _GO(KernelDropped);
@@ -57,19 +57,17 @@ void describe_event(struct FileEvent *evt) {
     _GO(OwnEvent);
     _GO(ItemCloned);
     printf("\n");
-#undef GO
-#undef str
-#undef xstr
+#undef _GO
+#undef _STR
 }
 
 void onFileAdd(FSEventStreamRef ref,
-               void *info,
+               void *unused,
                size_t numEvents,
-               void *eventPathsPtr,
+               char **eventPaths,
                const FSEventStreamEventFlags *eventFlags,
                const FSEventStreamEventId *eventIds)
 {
-    char **eventPaths = (char**)eventPathsPtr;
     printf("Event count %zu\n", numEvents);
     const FSEventStreamEventFlags to_ignore
         = kFSEventStreamEventFlagItemInodeMetaMod | kFSEventStreamEventFlagItemModified | kFSEventStreamEventFlagItemRemoved;
@@ -95,10 +93,14 @@ void onFileAdd(FSEventStreamRef ref,
         }
 
         char *newpath = NULL;
-        asprintf(&newpath, "%s/%03d_%s.wav", dirname(evt.path), nthfile, prefix);
+        asprintf(&newpath, "%s/%03zu_%s.wav", dirname(evt.path), nthfile, prefix);
         if (newpath == NULL) die("couldn't build path");
-        int ok = rename(eventPaths[ii], newpath);
-        fprintf(stderr, "mv %s %s\n", evt.path, newpath);
+        if (rename(evt.path, newpath) != 0) {
+            perror("Rename failed");
+            fprintf(stderr, "(tried moving %s to %s)\n", evt.path, newpath);
+        } else if (verbose) {
+            fprintf(stderr, "mv %s %s\n", evt.path, newpath);
+        }
         nthfile++;
     }
     if (verbose) printf("Done.\n");
@@ -106,20 +108,34 @@ void onFileAdd(FSEventStreamRef ref,
 
 int main(int argc, const char * argv[])
 {
-    if (argc != 2)
-        die("Error: Directory not provided.");
-    CFStringRef path = CFStringCreateWithCString(NULL, argv[1], kCFStringEncodingUTF8);
-    CFArrayRef paths = CFArrayCreate(NULL, (const void**)&path, 1, &kCFTypeArrayCallBacks);
-    FSEventStreamRef evts = FSEventStreamCreate(NULL, (FSEventStreamCallback)onFileAdd,
-                                                NULL, paths, kFSEventStreamEventIdSinceNow, 0.0,
-                                                kFSEventStreamCreateFlagFileEvents|kFSEventStreamCreateFlagIgnoreSelf);
-#pragma push -Wno-deprecated-declarations
-    FSEventStreamScheduleWithRunLoop(evts, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
-#pragma pop -Wnodeprecated-declarations
-    FSEventStreamStart(evts);
-    printf("Booting up…\n");
-    CFRunLoopRun();
-    CFRelease(paths);
-    CFRelease(path);
+    if (argc != 2) die("Error: Directory not provided.");
+    DIR *dir = opendir(argv[1]);
+    if (dir == NULL) {
+        die(strerror(errno));
+    }
+
+    struct dirent* entry;
+    while ((entry = readdir(dir))) {
+        char *extension = strrchr(entry->d_name, (int)'.');
+        if (strcmp(extension, ".wav") == 0) nthfile++;
+    }
+    closedir(dir);
+    nthfile--; // zero-indexed
+
+    if (verbose) printf("Starting at %zu\n", nthfile);
+    dispatch_queue_t queue = dispatch_queue_create("chopwatcher", DISPATCH_QUEUE_SERIAL);
+    dispatch_async(dispatch_get_main_queue(), ^{
+            printf("Booting up…\n");
+            CFStringRef path = CFStringCreateWithFileSystemRepresentation(NULL, argv[1]);
+            CFArrayRef paths = CFArrayCreate(NULL, (const void**)&path, 1, &kCFTypeArrayCallBacks);
+            FSEventStreamRef evts = FSEventStreamCreate(NULL, (FSEventStreamCallback)onFileAdd,
+                                                        NULL, paths, kFSEventStreamEventIdSinceNow, 0.0,
+                                                        kFSEventStreamCreateFlagFileEvents|kFSEventStreamCreateFlagIgnoreSelf);
+            FSEventStreamSetDispatchQueue(evts, queue);
+            FSEventStreamStart(evts);
+            CFRelease(paths);
+            CFRelease(path);
+    });
+    dispatch_main();
     return 0;
 }

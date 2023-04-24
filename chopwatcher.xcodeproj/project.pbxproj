@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		5515C8AE29F30AE4003D2B4C /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 5515C8AD29F30AE4003D2B4C /* main.c */; };
+		5515C8AE29F30AE4003D2B4C /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 5515C8AD29F30AE4003D2B4C /* main.c */; settings = {COMPILER_FLAGS = "-Wall -Werror"; }; };
 		5515C8B629F30DFB003D2B4C /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5515C8B529F30DFB003D2B4C /* CoreServices.framework */; };
 /* End PBXBuildFile section */
 
