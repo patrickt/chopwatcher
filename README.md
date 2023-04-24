@@ -6,6 +6,10 @@ I wrote this because TidalCycles likes to refer to samples in a given directory 
 
 To run: `chopwatcher DIR`.
 
+# Supported OSes
+
+Only macOS for now 😞 Patches to make this use a cross-platform file watcher are most welcome.
+
 # License
 
 Public domain.
