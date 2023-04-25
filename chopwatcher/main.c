@@ -86,7 +86,6 @@ void onFileAdd(FSEventStreamRef ref,
         char *prefix = basename(evt.path);
         char *firstoccurrence = index(prefix, (int)'_') ?: index(prefix, (int)'.');
         if (firstoccurrence != NULL) {
-            printf("len: %d\n", (int)(firstoccurrence-prefix));
             prefix[firstoccurrence-prefix] = '\0';
         } else {
             prefix = "";
@@ -98,6 +97,7 @@ void onFileAdd(FSEventStreamRef ref,
         if (rename(evt.path, newpath) != 0) {
             perror("Rename failed");
             fprintf(stderr, "(tried moving %s to %s)\n", evt.path, newpath);
+            exit(EXIT_FAILURE);
         } else if (verbose) {
             fprintf(stderr, "mv %s %s\n", evt.path, newpath);
         }
