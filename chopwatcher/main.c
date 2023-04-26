@@ -12,7 +12,7 @@
 #include <CoreServices/CoreServices.h>
 
 static size_t nthfile = 1;
-static bool verbose = false;
+static bool verbose = true;
 
 void die(const char* message)
 {
@@ -27,12 +27,18 @@ struct FileEvent {
     FSEventStreamEventId ident;
 };
 
+#define _FLAG(name) kFSEventStreamEventFlag##name
+
+const FSEventStreamEventFlags FINDER_COPY = _FLAG(ItemChangeOwner) | _FLAG(ItemCreated) | _FLAG(ItemInodeMetaMod) | _FLAG(ItemIsFile) | _FLAG(ItemCloned);
+
+const FSEventStreamEventFlags NEURALMIX_CREATE = _FLAG(ItemCreated) | _FLAG(ItemInodeMetaMod) | _FLAG(ItemIsFile) | _FLAG(ItemModified) | _FLAG(ItemXattrMod);
+
 void describe_event(struct FileEvent *evt) {
     printf("Event id %" PRIu64 ":\n", (uint64_t)evt->ident);
     printf("\tpath: %s\n", evt->path);
     printf("\tindex: %zu\n", evt->index);
 #define _STR(s) #s
-#define _GO(name) if (evt->flags & kFSEventStreamEventFlag##name) printf("\t%s\n", _STR(name));
+#define _GO(name) if (evt->flags & _FLAG(name)) printf("\t%s\n", _STR(name));
     _GO(MustScanSubDirs);
     _GO(UserDropped);
     _GO(KernelDropped);
@@ -61,6 +67,8 @@ void describe_event(struct FileEvent *evt) {
 #undef _STR
 }
 
+#undef _FLAG
+
 void onFileAdd(FSEventStreamRef ref,
                void *unused,
                size_t numEvents,
@@ -68,9 +76,7 @@ void onFileAdd(FSEventStreamRef ref,
                const FSEventStreamEventFlags *eventFlags,
                const FSEventStreamEventId *eventIds)
 {
-    printf("Event count %zu\n", numEvents);
-    const FSEventStreamEventFlags to_ignore
-        = kFSEventStreamEventFlagItemInodeMetaMod | kFSEventStreamEventFlagItemModified | kFSEventStreamEventFlagItemRemoved;
+    if (verbose) printf("Event count %zu\n", numEvents);
     for (size_t ii=0; ii<numEvents; ii++) {
         struct FileEvent evt =
             { .index = ii,
@@ -79,7 +85,11 @@ void onFileAdd(FSEventStreamRef ref,
               .ident = eventIds[ii],
             };
         if (verbose) describe_event(&evt);
-        if (evt.flags & to_ignore) {
+        if (evt.flags == FINDER_COPY) {
+            if (verbose) printf("Recognized Finder copy\n");
+        } else if (evt.flags == NEURALMIX_CREATE) {
+            if (verbose) printf("Recognized NeuralMix create\n");
+        } else {
             printf("Ignoring...\n");
             continue;
         }
@@ -129,7 +139,7 @@ int main(int argc, const char * argv[])
             CFStringRef path = CFStringCreateWithFileSystemRepresentation(NULL, argv[1]);
             CFArrayRef paths = CFArrayCreate(NULL, (const void**)&path, 1, &kCFTypeArrayCallBacks);
             FSEventStreamRef evts = FSEventStreamCreate(NULL, (FSEventStreamCallback)onFileAdd,
-                                                        NULL, paths, kFSEventStreamEventIdSinceNow, 0.0,
+                                                        NULL, paths, kFSEventStreamEventIdSinceNow, 0.5,
                                                         kFSEventStreamCreateFlagFileEvents|kFSEventStreamCreateFlagIgnoreSelf);
             FSEventStreamSetDispatchQueue(evts, queue);
             FSEventStreamStart(evts);
