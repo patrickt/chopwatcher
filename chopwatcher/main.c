@@ -11,7 +11,8 @@
 #include <libgen.h>
 #include <CoreServices/CoreServices.h>
 
-static size_t nthfile = 1;
+#define countof(x) (sizeof(x) / sizeof(x[0]))
+
 static bool verbose = true;
 
 void die(const char* message)
@@ -27,11 +28,27 @@ struct FileEvent {
     FSEventStreamEventId ident;
 };
 
+struct Action {
+    char *name;
+    FSEventStreamEventFlags flags;
+};
+
 #define _FLAG(name) kFSEventStreamEventFlag##name
 
-const FSEventStreamEventFlags FINDER_COPY = _FLAG(ItemChangeOwner) | _FLAG(ItemCreated) | _FLAG(ItemInodeMetaMod) | _FLAG(ItemIsFile) | _FLAG(ItemCloned);
-
-const FSEventStreamEventFlags NEURALMIX_CREATE = _FLAG(ItemCreated) | _FLAG(ItemInodeMetaMod) | _FLAG(ItemIsFile) | _FLAG(ItemModified) | _FLAG(ItemXattrMod);
+const struct Action ALL_ACTIONS[] = {
+    {
+        .name = "Finder copy",
+        .flags = _FLAG(ItemChangeOwner) | _FLAG(ItemCreated) | _FLAG(ItemInodeMetaMod) | _FLAG(ItemIsFile) | _FLAG(ItemCloned),
+    },
+    {
+        .name = "Finder move",
+        .flags = _FLAG(ItemIsFile) | _FLAG(ItemRenamed),
+    },
+    {
+        .name = "NeuralMix create",
+        .flags = _FLAG(ItemCreated) | _FLAG(ItemInodeMetaMod) | _FLAG(ItemIsFile) | _FLAG(ItemModified) | _FLAG(ItemXattrMod),
+    },
+};
 
 void describe_event(struct FileEvent *evt) {
     printf("Event id %" PRIu64 ":\n", (uint64_t)evt->ident);
@@ -85,25 +102,51 @@ void onFileAdd(FSEventStreamRef ref,
               .ident = eventIds[ii],
             };
         if (verbose) describe_event(&evt);
-        if (evt.flags == FINDER_COPY) {
-            if (verbose) printf("Recognized Finder copy\n");
-        } else if (evt.flags == NEURALMIX_CREATE) {
-            if (verbose) printf("Recognized NeuralMix create\n");
-        } else {
+
+        bool recognized = false;
+        for (size_t action=0; action < countof(ALL_ACTIONS); action++) {
+            if (evt.flags == ALL_ACTIONS[action].flags) {
+                if (verbose) printf("Recognized %s\n", ALL_ACTIONS[action].name);
+                recognized = true;
+                break;
+            }
+        }
+        if (!recognized) {
             printf("Ignoring...\n");
             continue;
         }
-        char *prefix = basename(evt.path);
-        char *firstoccurrence = index(prefix, (int)'_') ?: index(prefix, (int)'.');
-        if (firstoccurrence != NULL) {
-            prefix[firstoccurrence-prefix] = '\0';
-        } else {
-            prefix = "";
-        }
+
+        char *base = basename(evt.path);
+        char *filename = strdup(base);
+        char *toFree = filename;
+        char *foldername = strsep(&filename, "_");
+
+        assert(filename != NULL && foldername != NULL);
+
+        printf("Folder: %s, file: %s\n", foldername, filename);
 
         char *newpath = NULL;
-        asprintf(&newpath, "%s/%03zu_%s.wav", dirname(evt.path), nthfile, prefix);
-        if (newpath == NULL) die("couldn't build path");
+        size_t nthfile = 1;
+        asprintf(&newpath, "/Users/patrickt/beats/packs/%s", foldername);
+        DIR *dir = opendir(newpath);
+        if (dir == NULL) {
+            char *err = strcat(newpath, strerror(errno));
+            die(err);
+        }
+
+        struct dirent* entry;
+        while ((entry = readdir(dir))) {
+            char *extension = strrchr(entry->d_name, (int)'.');
+            if (strcmp(extension, ".wav") == 0) nthfile++;
+        }
+        closedir(dir);
+        nthfile--; // zero-indexed
+        free(newpath);
+        newpath = NULL;
+
+        asprintf(&newpath, "/Users/patrickt/beats/packs/%s/%03zu_%s", foldername, nthfile, filename);
+        assert(newpath != NULL);
+        printf("New path: %s\n", newpath);
         if (rename(evt.path, newpath) != 0) {
             perror("Rename failed");
             fprintf(stderr, "(tried moving %s to %s)\n", evt.path, newpath);
@@ -111,7 +154,9 @@ void onFileAdd(FSEventStreamRef ref,
         } else if (verbose) {
             fprintf(stderr, "mv %s %s\n", evt.path, newpath);
         }
-        nthfile++;
+
+        free(newpath);
+        free(toFree);
     }
     if (verbose) printf("Done.\n");
 }
@@ -124,15 +169,6 @@ int main(int argc, const char * argv[])
         die(strerror(errno));
     }
 
-    struct dirent* entry;
-    while ((entry = readdir(dir))) {
-        char *extension = strrchr(entry->d_name, (int)'.');
-        if (strcmp(extension, ".wav") == 0) nthfile++;
-    }
-    closedir(dir);
-    nthfile--; // zero-indexed
-
-    if (verbose) printf("Starting at %zu\n", nthfile);
     dispatch_queue_t queue = dispatch_queue_create("chopwatcher", DISPATCH_QUEUE_SERIAL);
     dispatch_async(dispatch_get_main_queue(), ^{
             printf("Booting up…\n");
