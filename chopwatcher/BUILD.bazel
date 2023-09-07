@@ -1,5 +1,9 @@
 cc_binary(
     name = "chopwatcher",
     srcs = ["main.c"],
+    copts = [
+        "-O1",
+        "-Wall",
+    ],
     linkopts = ["-framework CoreServices"],
 )

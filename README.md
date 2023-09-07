@@ -4,7 +4,12 @@ This program uses the FSEvents API to monitor .wav files dropped into the direct
 
 I wrote this because TidalCycles likes to refer to samples in a given directory with a numeric identifier, and I was tired of manually figuring out the number to which a given sample corresponded.
 
-To run: `chopwatcher DIR`.
+To run: `just run DIR`.
+
+# Dependencies
+
+* Bazel, with `bzlmod` support
+* `just` if you want a quick way to build and run it
 
 # Supported OSes
 

@@ -1,0 +1,6 @@
+common --color=yes
+common --enable_bzlmod
+
+build --jobs=8
+
+test --test_output=all
