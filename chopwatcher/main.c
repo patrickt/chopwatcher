@@ -1,4 +1,4 @@
-/* -*- c-basic-offset: 4; compile-command: "xcodebuild"; -*- */
+/* -*- c-basic-offset: 4; compile-command: bazel-build -*- */
 //
 //  main.c
 //  chopwatcher
