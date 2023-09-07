@@ -1,0 +1,5 @@
+cc_binary(
+    name = "chopwatcher",
+    srcs = ["main.c"],
+    linkopts = ["-framework CoreServices"],
+)
